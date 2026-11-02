@@ -1,0 +1,13 @@
+{
+  "name": "A-Chat",
+  "short_name": "A-Chat",
+  "description": "منصة مراسلة فورية",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1220",
+  "theme_color": "#101b2d"
+}
