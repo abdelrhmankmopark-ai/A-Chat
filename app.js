@@ -70,7 +70,7 @@ let unsubscribeChats = null;
 let unsubscribeMessages = null;
 let lastSeenTimer = null;
 
-// الرسائل
+// عرض الرسائل
 function showMessage(text) {
   message.textContent = text;
 }
@@ -519,7 +519,6 @@ function loadMessages(chatId) {
     snapshot.forEach(messageDoc => {
       const data = messageDoc.data();
 
-      // تحديد الرسائل الواردة كمقروءة
       markMessageAsRead(messageDoc);
 
       const bubble = document.createElement("div");
@@ -535,7 +534,6 @@ function loadMessages(chatId) {
 
       bubble.appendChild(text);
 
-      // علامات الصح للرسائل المرسلة
       if (isMine) {
         const ticks = document.createElement("span");
 
@@ -562,7 +560,7 @@ function loadMessages(chatId) {
   });
 }
 
-// إرسال رسالة
+// إرسال رسالة - نسخة التشخيص
 async function sendMessage() {
   const text = messageInput.value.trim();
 
@@ -574,17 +572,29 @@ async function sendMessage() {
 
   sendBtn.disabled = true;
 
+  let savedMessage = false;
+
   try {
+    showAppMessage("جارٍ حفظ الرسالة...");
+
+    // الخطوة الأولى: حفظ الرسالة
     await addDoc(
       collection(db, "chats", currentChatId, "messages"),
       {
         senderId: currentUser.uid,
-        text,
+        text: text,
         createdAt: serverTimestamp(),
         readBy: [currentUser.uid]
       }
     );
 
+    savedMessage = true;
+
+    messageInput.value = "";
+
+    showAppMessage("تم حفظ الرسالة، جارٍ تحديث المحادثة...");
+
+    // الخطوة الثانية: تحديث المحادثة
     await updateDoc(
       doc(db, "chats", currentChatId),
       {
@@ -593,11 +603,27 @@ async function sendMessage() {
       }
     );
 
-    messageInput.value = "";
-    showAppMessage("");
+    showAppMessage("تم إرسال الرسالة بنجاح ✅");
 
   } catch (error) {
-    showAppMessage("تعذر إرسال الرسالة: " + error.message);
+    console.error("A-Chat Send Error:", error);
+
+    if (savedMessage) {
+      showAppMessage(
+        "الرسالة اتحفظت، لكن تحديث المحادثة فشل. رمز الخطأ: " +
+        error.code +
+        " | " +
+        error.message
+      );
+
+    } else {
+      showAppMessage(
+        "فشل حفظ الرسالة. رمز الخطأ: " +
+        error.code +
+        " | " +
+        error.message
+      );
+    }
 
   } finally {
     sendBtn.disabled = false;
