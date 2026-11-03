@@ -102,7 +102,7 @@ function updateMyDisplay(profile) {
   const avatar = profile?.avatar_url || "👤";
   const name = profile?.display_name || profile?.username || "مستخدم A-Chat";
   myName.replaceChildren();
-  if (/^https?:\\/\\//i.test(avatar)) {
+  if (avatar.startsWith("https://") || avatar.startsWith("http://")) {
     const image = document.createElement("img");
     image.src = avatar;
     image.alt = "الصورة الشخصية";
