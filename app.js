@@ -30,6 +30,24 @@ const myName = $("myName");
 const avatarSection = $("avatarSection");
 const avatarButtons = document.querySelectorAll(".avatar-option");
 
+const profileBar = document.querySelector(".profile-bar");
+const editNameBtn = document.createElement("button");
+editNameBtn.type = "button";
+editNameBtn.className = "profile-edit-btn";
+editNameBtn.textContent = "تعديل الاسم";
+const changeAvatarBtn = document.createElement("button");
+changeAvatarBtn.type = "button";
+changeAvatarBtn.className = "profile-edit-btn";
+changeAvatarBtn.textContent = "تغيير الصورة";
+const avatarUploadInput = document.createElement("input");
+avatarUploadInput.type = "file";
+avatarUploadInput.accept = "image/jpeg,image/png,image/webp";
+avatarUploadInput.hidden = true;
+profileBar?.insertBefore(editNameBtn, logoutBtn);
+profileBar?.insertBefore(changeAvatarBtn, logoutBtn);
+profileBar?.appendChild(avatarUploadInput);
+
+
 const AVATARS = ["👨‍💻", "🧑‍🚀", "🦊", "🐼"];
 let selectedAvatar = null;
 let signupStarted = false;
@@ -83,8 +101,94 @@ themeToggle.addEventListener("click", () => {
 function updateMyDisplay(profile) {
   const avatar = profile?.avatar_url || "👤";
   const name = profile?.display_name || profile?.username || "مستخدم A-Chat";
-  myName.textContent = avatar + " " + name + (profile?.username ? "  @" + profile.username : "");
+  myName.replaceChildren();
+  if (/^https?:\\/\\//i.test(avatar)) {
+    const image = document.createElement("img");
+    image.src = avatar;
+    image.alt = "الصورة الشخصية";
+    image.className = "my-profile-avatar";
+    myName.appendChild(image);
+  } else {
+    myName.append(document.createTextNode(avatar + " "));
+  }
+  myName.append(document.createTextNode(name + (profile?.username ? "  @" + profile.username : "")));
 }
+
+
+editNameBtn.addEventListener("click", async () => {
+  if (!currentUser || !currentProfile) return;
+  const value = window.prompt("اكتب الاسم الذي تريد ظهوره للآخرين:", currentProfile.display_name || "");
+  if (value === null) return;
+  const display_name = value.trim().slice(0, 40);
+  if (!display_name) {
+    showAppMessage("الاسم لا يمكن أن يكون فارغًا.");
+    return;
+  }
+  editNameBtn.disabled = true;
+  try {
+    const { data, error } = await supabase.from("profiles")
+      .update({ display_name })
+      .eq("id", currentUser.id)
+      .select("id,username,display_name,avatar_url,last_seen")
+      .single();
+    if (error) throw error;
+    currentProfile = data;
+    updateMyDisplay(data);
+    showAppMessage("تم تحديث اسمك بنجاح ✅");
+  } catch (error) {
+    showAppMessage("تعذر تحديث الاسم: " + friendlyError(error));
+  } finally {
+    editNameBtn.disabled = false;
+  }
+});
+
+changeAvatarBtn.addEventListener("click", () => {
+  if (currentUser) avatarUploadInput.click();
+});
+
+avatarUploadInput.addEventListener("change", async () => {
+  const file = avatarUploadInput.files?.[0];
+  if (!file || !currentUser) return;
+  const allowed = ["image/jpeg", "image/png", "image/webp"];
+  if (!allowed.includes(file.type)) {
+    showAppMessage("اختر صورة JPG أو PNG أو WebP.");
+    avatarUploadInput.value = "";
+    return;
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    showAppMessage("حجم الصورة يجب ألا يتجاوز 2 ميجابايت.");
+    avatarUploadInput.value = "";
+    return;
+  }
+  changeAvatarBtn.disabled = true;
+  showAppMessage("جارٍ رفع الصورة الشخصية...");
+  try {
+    const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+    const path = currentUser.id + "/" + Date.now() + "." + extension;
+    const { error: uploadError } = await supabase.storage.from("avatars").upload(path, file, {
+      cacheControl: "3600",
+      contentType: file.type,
+      upsert: false
+    });
+    if (uploadError) throw uploadError;
+    const { data: publicData } = supabase.storage.from("avatars").getPublicUrl(path);
+    const { data, error } = await supabase.from("profiles")
+      .update({ avatar_url: publicData.publicUrl })
+      .eq("id", currentUser.id)
+      .select("id,username,display_name,avatar_url,last_seen")
+      .single();
+    if (error) throw error;
+    currentProfile = data;
+    updateMyDisplay(data);
+    showAppMessage("تم تحديث صورتك الشخصية بنجاح ✅");
+  } catch (error) {
+    console.error(error);
+    showAppMessage("تعذر رفع الصورة: " + friendlyError(error));
+  } finally {
+    changeAvatarBtn.disabled = false;
+    avatarUploadInput.value = "";
+  }
+});
 
 function makeUsername(email) {
   const raw = (email || "user").split("@")[0].toLowerCase();
