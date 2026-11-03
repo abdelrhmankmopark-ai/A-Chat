@@ -78,7 +78,10 @@ let currentFriendId = null;
 
 let unsubscribeChats = null;
 let unsubscribeMessages = null;
+let unsubscribeFriendStatus = null;
+
 let lastSeenTimer = null;
+let friendStatusTimer = null;
 
 // الرسائل
 function showMessage(text) {
@@ -116,7 +119,6 @@ function applyTheme(theme) {
   localStorage.setItem("a-chat-theme", theme);
 }
 
-// الوضع الأخضر والأبيض هو الافتراضي
 applyTheme(localStorage.getItem("a-chat-theme") || "light");
 
 themeToggle.addEventListener("click", () => {
@@ -197,6 +199,7 @@ function stopLastSeen() {
 
 function startLastSeen() {
   stopLastSeen();
+
   updateLastSeen();
 
   lastSeenTimer = setInterval(() => {
@@ -214,6 +217,94 @@ document.addEventListener("visibilitychange", () => {
     updateLastSeen();
   }
 });
+
+// إيقاف متابعة حالة الصديق
+function stopFriendStatus() {
+  if (unsubscribeFriendStatus) {
+    unsubscribeFriendStatus();
+    unsubscribeFriendStatus = null;
+  }
+
+  if (friendStatusTimer) {
+    clearInterval(friendStatusTimer);
+    friendStatusTimer = null;
+  }
+}
+
+// تنسيق حالة الصديق
+function updateFriendStatus(profile) {
+  const status = $("friendStatus");
+
+  if (!status) return;
+
+  const lastSeen = profile?.lastSeen;
+
+  if (!lastSeen || !lastSeen.toDate) {
+    status.textContent = "⚫ غير متصل";
+    return;
+  }
+
+  const lastSeenDate = lastSeen.toDate();
+  const now = Date.now();
+
+  // نعتبر المستخدم متصلاً إذا تم تحديث آخر ظهوره خلال آخر دقيقتين
+  const isOnline = now - lastSeenDate.getTime() < 120000;
+
+  if (isOnline) {
+    status.textContent = "🟢 متصل الآن";
+  } else {
+    status.textContent =
+      "⚫ " + formatLastSeen(lastSeen);
+  }
+}
+
+// متابعة حالة الصديق مباشرة
+function listenToFriendStatus(friendId) {
+  stopFriendStatus();
+
+  const statusRef = doc(db, "publicProfiles", friendId);
+
+  unsubscribeFriendStatus = onSnapshot(
+    statusRef,
+    snapshot => {
+      if (!snapshot.exists()) {
+        const status = $("friendStatus");
+
+        if (status) {
+          status.textContent = "⚫ غير متصل";
+        }
+
+        return;
+      }
+
+      updateFriendStatus(snapshot.data());
+    },
+    error => {
+      console.error("Friend status error:", error);
+
+      const status = $("friendStatus");
+
+      if (status) {
+        status.textContent = "تعذر تحميل الحالة";
+      }
+    }
+  );
+
+  // تحديث شكل الحالة كل 15 ثانية
+  friendStatusTimer = setInterval(async () => {
+    if (currentFriendId !== friendId) return;
+
+    try {
+      const profileSnap = await getDoc(statusRef);
+
+      if (profileSnap.exists()) {
+        updateFriendStatus(profileSnap.data());
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }, 15000);
+}
 
 // إنشاء حساب جديد
 signupBtn.addEventListener("click", async () => {
@@ -309,6 +400,7 @@ onAuthStateChanged(auth, async user => {
 
     try {
       await createProfile(user);
+
       startLastSeen();
       loadChats();
 
@@ -319,6 +411,7 @@ onAuthStateChanged(auth, async user => {
 
   } else {
     stopLastSeen();
+    stopFriendStatus();
 
     authSection.hidden = false;
     chatSection.hidden = true;
@@ -430,6 +523,8 @@ async function openChat(friendId, friendName) {
   if (!currentUser) return;
 
   try {
+    stopFriendStatus();
+
     const chatId = makeChatId(currentUser.uid, friendId);
     const chatRef = doc(db, "chats", chatId);
     const chatSnap = await getDoc(chatRef);
@@ -469,7 +564,10 @@ async function openChat(friendId, friendName) {
       chatTitle.insertAdjacentElement("afterend", status);
     }
 
-    status.textContent = formatLastSeen(friendProfile.lastSeen);
+    updateFriendStatus(friendProfile);
+
+    // متابعة حالة الصديق مباشرة من Firebase
+    listenToFriendStatus(friendId);
 
     loadMessages(chatId);
 
@@ -660,6 +758,8 @@ messageInput.addEventListener("keydown", event => {
 // الرجوع من المحادثة
 backBtn.addEventListener("click", () => {
   conversationSection.hidden = true;
+
+  stopFriendStatus();
 
   if (unsubscribeMessages) {
     unsubscribeMessages();
