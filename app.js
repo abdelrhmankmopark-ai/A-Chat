@@ -38,25 +38,20 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// عناصر الصفحة
 const $ = id => document.getElementById(id);
 
 const authSection = $("authSection");
 const chatSection = $("chatSection");
-
 const emailInput = $("email");
 const passwordInput = $("password");
 const loginBtn = $("loginBtn");
 const signupBtn = $("signupBtn");
 const message = $("message");
-
 const themeToggle = $("themeToggle");
 const logoutBtn = $("logoutBtn");
-
 const searchInput = $("searchInput");
 const searchBtn = $("searchBtn");
 const searchResults = $("searchResults");
-
 const chatsList = $("chatsList");
 const conversationSection = $("conversationSection");
 const chatTitle = $("chatTitle");
@@ -64,18 +59,15 @@ const messagesList = $("messagesList");
 const messageInput = $("messageInput");
 const sendBtn = $("sendBtn");
 const backBtn = $("backBtn");
-
 const appMessage = $("appMessage");
 const myName = $("myName");
 
 let currentUser = null;
 let currentChatId = null;
-let currentFriendId = null;
-
 let unsubscribeChats = null;
 let unsubscribeMessages = null;
+let lastSeenTimer = null;
 
-// الرسائل
 function showMessage(text) {
   message.textContent = text;
 }
@@ -87,21 +79,16 @@ function showAppMessage(text) {
 // الوضع الليلي والنهاري
 function applyTheme(theme) {
   document.body.classList.toggle("light", theme === "light");
-
-  themeToggle.textContent =
-    theme === "light" ? "🌙" : "☀️";
-
+  themeToggle.textContent = theme === "light" ? "🌙" : "☀️";
   localStorage.setItem("a-chat-theme", theme);
 }
 
 applyTheme(localStorage.getItem("a-chat-theme") || "dark");
 
 themeToggle.addEventListener("click", () => {
-  const next = document.body.classList.contains("light")
-    ? "dark"
-    : "light";
-
-  applyTheme(next);
+  applyTheme(
+    document.body.classList.contains("light") ? "dark" : "light"
+  );
 });
 
 // إنشاء ملف المستخدم
@@ -123,7 +110,7 @@ async function createProfile(user) {
 
   if (!publicSnap.exists()) {
     await setDoc(publicRef, {
-      username: username,
+      username,
       usernameLower: username,
       displayName: username,
       createdAt: serverTimestamp()
@@ -132,6 +119,47 @@ async function createProfile(user) {
 
   myName.textContent = username;
 }
+
+// تحديث آخر ظهور
+async function updateLastSeen() {
+  if (!currentUser) return;
+
+  try {
+    await updateDoc(
+      doc(db, "publicProfiles", currentUser.uid),
+      {
+        lastSeen: serverTimestamp()
+      }
+    );
+  } catch (error) {
+    console.error("Last seen error:", error);
+  }
+}
+
+function startLastSeen() {
+  stopLastSeen();
+
+  updateLastSeen();
+
+  lastSeenTimer = setInterval(() => {
+    if (document.visibilityState === "visible") {
+      updateLastSeen();
+    }
+  }, 60000);
+}
+
+function stopLastSeen() {
+  if (lastSeenTimer) {
+    clearInterval(lastSeenTimer);
+    lastSeenTimer = null;
+  }
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && currentUser) {
+    updateLastSeen();
+  }
+});
 
 // إنشاء حساب
 signupBtn.addEventListener("click", async () => {
@@ -195,12 +223,15 @@ onAuthStateChanged(auth, async user => {
 
     try {
       await createProfile(user);
+      startLastSeen();
       loadChats();
     } catch (error) {
       showAppMessage("تعذر تحميل الحساب: " + error.message);
     }
 
   } else {
+    stopLastSeen();
+
     authSection.hidden = false;
     chatSection.hidden = true;
 
@@ -211,17 +242,16 @@ onAuthStateChanged(auth, async user => {
     unsubscribeMessages = null;
 
     currentChatId = null;
-    currentFriendId = null;
     conversationSection.hidden = true;
   }
 });
 
-// البحث عن الأصدقاء باسم المستخدم
+// البحث عن المستخدمين
 searchBtn.addEventListener("click", async () => {
   const username = searchInput.value.trim().toLowerCase();
 
   if (!username) {
-    return showAppMessage("اكتب اسم المستخدم للبحث");
+    return showAppMessage("اكتب اسم المستخدم");
   }
 
   searchResults.replaceChildren();
@@ -239,15 +269,14 @@ searchBtn.addEventListener("click", async () => {
     searchResults.replaceChildren();
 
     if (result.empty) {
-      showAppMessage("لم يتم العثور على مستخدم بهذا الاسم");
+      showAppMessage("لم يتم العثور على المستخدم");
       return;
     }
 
     result.forEach(profileDoc => {
-      const friendId = profileDoc.id;
-      const profile = profileDoc.data();
+      if (profileDoc.id === currentUser.uid) return;
 
-      if (friendId === currentUser.uid) return;
+      const profile = profileDoc.data();
 
       const row = document.createElement("div");
       row.className = "search-result";
@@ -259,7 +288,7 @@ searchBtn.addEventListener("click", async () => {
       button.textContent = "مراسلة";
 
       button.addEventListener("click", () => {
-        openChat(friendId, profile.username);
+        openChat(profileDoc.id, profile.username);
       });
 
       row.append(name, button);
@@ -269,13 +298,24 @@ searchBtn.addEventListener("click", async () => {
     showAppMessage("");
 
   } catch (error) {
-    showAppMessage("حدث خطأ أثناء البحث: " + error.message);
+    showAppMessage("خطأ في البحث: " + error.message);
   }
 });
 
-// إنشاء معرف ثابت للمحادثة
+// معرف المحادثة
 function makeChatId(uid1, uid2) {
   return [uid1, uid2].sort().join("_");
+}
+
+// تنسيق آخر ظهور
+function formatLastSeen(timestamp) {
+  if (!timestamp || !timestamp.toDate) {
+    return "آخر ظهور غير متاح";
+  }
+
+  const date = timestamp.toDate();
+
+  return "آخر ظهور: " + date.toLocaleString("ar-EG");
 }
 
 // فتح محادثة
@@ -298,12 +338,28 @@ async function openChat(friendId, friendName) {
     }
 
     currentChatId = chatId;
-    currentFriendId = friendId;
 
     chatTitle.textContent = friendName;
 
     conversationSection.hidden = false;
     searchResults.replaceChildren();
+
+    // عرض آخر ظهور
+    const profileSnap = await getDoc(
+      doc(db, "publicProfiles", friendId)
+    );
+
+    let status = $("friendStatus");
+
+    if (!status) {
+      status = document.createElement("p");
+      status.id = "friendStatus";
+      chatTitle.insertAdjacentElement("afterend", status);
+    }
+
+    status.textContent = profileSnap.exists()
+      ? formatLastSeen(profileSnap.data().lastSeen)
+      : "آخر ظهور غير متاح";
 
     loadMessages(chatId);
 
@@ -312,7 +368,7 @@ async function openChat(friendId, friendName) {
   }
 }
 
-// تحميل قائمة المحادثات
+// تحميل المحادثات
 function loadChats() {
   if (unsubscribeChats) unsubscribeChats();
 
@@ -384,11 +440,11 @@ function loadChats() {
     }
 
   }, error => {
-    showAppMessage("خطأ في تحميل المحادثات: " + error.message);
+    showAppMessage("خطأ في المحادثات: " + error.message);
   });
 }
 
-// تحميل الرسائل لحظيًا
+// تحميل الرسائل
 function loadMessages(chatId) {
   if (unsubscribeMessages) unsubscribeMessages();
 
@@ -440,7 +496,7 @@ async function sendMessage() {
       collection(db, "chats", currentChatId, "messages"),
       {
         senderId: currentUser.uid,
-        text: text,
+        text,
         createdAt: serverTimestamp()
       }
     );
@@ -468,7 +524,7 @@ messageInput.addEventListener("keydown", event => {
   }
 });
 
-// الرجوع لقائمة المحادثات
+// الرجوع
 backBtn.addEventListener("click", () => {
   conversationSection.hidden = true;
 
@@ -478,7 +534,6 @@ backBtn.addEventListener("click", () => {
   }
 
   currentChatId = null;
-  currentFriendId = null;
 });
 
 // تسجيل الخروج
