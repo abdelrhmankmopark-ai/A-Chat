@@ -6,9 +6,47 @@
   <meta name="description" content="A-Chat - تواصل مع أصدقائك">
   <title>A-Chat</title>
   <link rel="manifest" href="./manifest.json">
-  <link rel="stylesheet" href="./style.css">
-</head>
-<body><header class="topbar">
+  <link rel="stylesheet" href="./style.css">  <style>
+    .avatar-section {
+      margin: 18px 0;
+      text-align: center;
+    }
+
+    .avatar-section[hidden] {
+      display: none;
+    }
+
+    .avatar-section h3 {
+      margin-bottom: 14px;
+    }
+
+    .avatar-options {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .avatar-option {
+      border: 2px solid transparent;
+      border-radius: 16px;
+      background: #26364d;
+      padding: 12px 5px;
+      font-size: 34px;
+      cursor: pointer;
+    }
+
+    .avatar-option.selected {
+      border-color: #35b9a5;
+      background: #174b4b;
+      transform: scale(1.05);
+    }
+
+    .avatar-hint {
+      font-size: 13px;
+      color: #aaa;
+      margin-top: 10px;
+    }
+  </style></head><body><header class="topbar">
   <h1>A-Chat</h1>
   <div class="header-actions">
     <span>تواصل بلا حدود</span>
@@ -25,6 +63,28 @@
 
   <input id="email" type="email" placeholder="البريد الإلكتروني">
   <input id="password" type="password" placeholder="كلمة المرور">
+
+  <section id="avatarSection" class="avatar-section" hidden>
+    <h3>اختر صورتك الشخصية</h3>
+
+    <div class="avatar-options">
+
+      <button type="button" class="avatar-option"
+        data-avatar="👨‍💻" aria-label="الصورة الأولى">👨‍💻</button>
+
+      <button type="button" class="avatar-option"
+        data-avatar="🧑‍🚀" aria-label="الصورة الثانية">🧑‍🚀</button>
+
+      <button type="button" class="avatar-option"
+        data-avatar="🦊" aria-label="الصورة الثالثة">🦊</button>
+
+      <button type="button" class="avatar-option"
+        data-avatar="🐼" aria-label="الصورة الرابعة">🐼</button>
+
+    </div>
+
+    <p class="avatar-hint">اختار الأفاتار اللي يعجبك</p>
+  </section>
 
   <button id="loginBtn">تسجيل الدخول</button>
   <button id="signupBtn" class="secondary">إنشاء حساب جديد</button>
@@ -73,10 +133,10 @@
 <p id="appMessage" aria-live="polite"></p>
 
   </section></main><script type="module" src="./app.js"></script><script>
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js");
-  });
-}
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js");
+    });
+  }
 </script></body>
 </html>
