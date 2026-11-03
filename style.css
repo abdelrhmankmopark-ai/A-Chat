@@ -354,3 +354,26 @@ display: none;
 height: 300px;
 }
 }
+
+
+/* الملف الشخصي */
+.profile-edit-btn {
+  background: var(--secondary);
+  color: var(--text);
+  padding: 9px 11px;
+  font-size: 12px;
+  margin: 4px;
+}
+.my-profile-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  vertical-align: middle;
+  margin-left: 6px;
+  border: 2px solid var(--primary);
+}
+.profile-bar {
+  flex-wrap: wrap;
+  gap: 8px;
+}
