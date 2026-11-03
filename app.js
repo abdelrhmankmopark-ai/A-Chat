@@ -62,6 +62,14 @@ const backBtn = $("backBtn");
 const appMessage = $("appMessage");
 const myName = $("myName");
 
+const avatarSection = $("avatarSection");
+const avatarButtons = document.querySelectorAll(".avatar-option");
+
+const AVATARS = ["👨‍💻", "🧑‍🚀", "🦊", "🐼"];
+
+let selectedAvatar = null;
+let signupStarted = false;
+
 let currentUser = null;
 let currentChatId = null;
 let currentFriendId = null;
@@ -78,6 +86,20 @@ function showAppMessage(text) {
 appMessage.textContent = text;
 }
 
+// اختيار الأفاتار
+avatarButtons.forEach(button => {
+button.addEventListener("click", () => {
+selectedAvatar = button.dataset.avatar;
+
+avatarButtons.forEach(item => {
+  item.classList.toggle("selected", item === button);
+});
+
+showMessage("تم اختيار صورتك الشخصية " + selectedAvatar);
+
+});
+});
+
 // الوضع الليلي والنهاري
 function applyTheme(theme) {
 document.body.classList.toggle("light", theme === "light");
@@ -93,8 +115,13 @@ document.body.classList.contains("light") ? "dark" : "light"
 );
 });
 
+// عرض صورة المستخدم واسمه
+function updateMyDisplay(name, avatar) {
+myName.textContent = "${avatar || "👤"} ${name}";
+}
+
 // إنشاء ملف المستخدم
-async function createProfile(user) {
+async function createProfile(user, avatar = selectedAvatar) {
 const privateRef = doc(db, "users", user.uid);
 const publicRef = doc(db, "publicProfiles", user.uid);
 
@@ -115,11 +142,22 @@ await setDoc(publicRef, {
 username,
 usernameLower: username,
 displayName: username,
+avatar: AVATARS.includes(avatar) ? avatar : "👨‍💻",
 createdAt: serverTimestamp()
+});
+} else if (!publicSnap.data().avatar) {
+await updateDoc(publicRef, {
+avatar: AVATARS.includes(avatar) ? avatar : "👨‍💻"
 });
 }
 
-myName.textContent = username;
+const updatedProfile = await getDoc(publicRef);
+const profile = updatedProfile.data();
+
+updateMyDisplay(
+profile.displayName || username,
+profile.avatar || "👨‍💻"
+);
 }
 
 // آخر ظهور
@@ -160,8 +198,17 @@ updateLastSeen();
 }
 });
 
-// إنشاء حساب
+// بدء إنشاء الحساب وإظهار الأفاتارات
 signupBtn.addEventListener("click", async () => {
+
+if (!signupStarted) {
+signupStarted = true;
+avatarSection.hidden = false;
+signupBtn.textContent = "إنشاء الحساب";
+showMessage("اختار صورتك الشخصية أولاً");
+return;
+}
+
 const email = emailInput.value.trim();
 const password = passwordInput.value;
 
@@ -173,7 +220,12 @@ if (password.length < 6) {
 return showMessage("كلمة المرور يجب أن تكون 6 أحرف على الأقل");
 }
 
+if (!AVATARS.includes(selectedAvatar)) {
+return showMessage("اختار أفاتار قبل إنشاء الحساب");
+}
+
 try {
+signupBtn.disabled = true;
 showMessage("جارٍ إنشاء الحساب...");
 
 const result = await createUserWithEmailAndPassword(
@@ -182,11 +234,14 @@ const result = await createUserWithEmailAndPassword(
   password
 );
 
-await createProfile(result.user);
+await createProfile(result.user, selectedAvatar);
+
 showMessage("تم إنشاء الحساب بنجاح 🎉");
 
 } catch (error) {
 showMessage("خطأ: " + error.message);
+} finally {
+signupBtn.disabled = false;
 }
 });
 
@@ -241,6 +296,14 @@ currentChatId = null;
 currentFriendId = null;
 
 conversationSection.hidden = true;
+selectedAvatar = null;
+signupStarted = false;
+avatarSection.hidden = true;
+signupBtn.textContent = "إنشاء حساب جديد";
+
+avatarButtons.forEach(button => {
+  button.classList.remove("selected");
+});
 
 }
 });
@@ -279,7 +342,8 @@ result.forEach(profileDoc => {
   row.className = "search-result";
 
   const name = document.createElement("span");
-  name.textContent = "@" + profile.username;
+  name.textContent =
+    (profile.avatar || "👤") + " @" + profile.username;
 
   const button = document.createElement("button");
   button.textContent = "مراسلة";
@@ -335,13 +399,19 @@ if (!chatSnap.exists()) {
 currentChatId = chatId;
 currentFriendId = friendId;
 
-chatTitle.textContent = friendName;
-conversationSection.hidden = false;
-searchResults.replaceChildren();
-
 const profileSnap = await getDoc(
   doc(db, "publicProfiles", friendId)
 );
+
+const friendProfile = profileSnap.exists()
+  ? profileSnap.data()
+  : {};
+
+chatTitle.textContent =
+  (friendProfile.avatar || "👤") + " " + friendName;
+
+conversationSection.hidden = false;
+searchResults.replaceChildren();
 
 let status = $("friendStatus");
 
@@ -351,9 +421,7 @@ if (!status) {
   chatTitle.insertAdjacentElement("afterend", status);
 }
 
-status.textContent = profileSnap.exists()
-  ? formatLastSeen(profileSnap.data().lastSeen)
-  : "آخر ظهور غير متاح";
+status.textContent = formatLastSeen(friendProfile.lastSeen);
 
 loadMessages(chatId);
 
@@ -404,16 +472,20 @@ for (const chatDoc of chats) {
       doc(db, "publicProfiles", friendId)
     );
 
-    const friendName = profileSnap.exists()
-      ? profileSnap.data().username
-      : "مستخدم";
+    const profile = profileSnap.exists()
+      ? profileSnap.data()
+      : {};
+
+    const friendName = profile.username || "مستخدم";
+    const avatar = profile.avatar || "👤";
 
     const row = document.createElement("div");
     row.className = "chat-item";
 
     const info = document.createElement("div");
+
     const name = document.createElement("strong");
-    name.textContent = "@" + friendName;
+    name.textContent = avatar + " @" + friendName;
 
     const last = document.createElement("p");
     last.textContent = data.lastMessage || "ابدأ المحادثة";
