@@ -581,12 +581,45 @@ async function fetchMessages(chatId) {
   (data || []).forEach(item => {
     const bubble = document.createElement("div");
     bubble.className = "message " + (item.sender_id === currentUser.id ? "mine" : "theirs");
+
     const content = document.createElement("span");
     content.textContent = item.content;
     bubble.appendChild(content);
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.textContent = "حذف للطرفين";
+    deleteBtn.className = "delete-message-btn";
+    deleteBtn.style.cssText = "display:block;margin-top:7px;padding:4px 8px;border:0;border-radius:8px;background:#b42318;color:#fff;font-size:11px;cursor:pointer";
+    deleteBtn.addEventListener("click", () => deleteMessageForBoth(item.id, deleteBtn));
+    bubble.appendChild(deleteBtn);
+
     messagesList.appendChild(bubble);
   });
   messagesList.scrollTop = messagesList.scrollHeight;
+}
+
+async function deleteMessageForBoth(messageId, button) {
+  if (!currentUser || !currentChatId) return;
+  const confirmed = window.confirm("هل تريد حذف هذه الرسالة من عندك وعند الطرف الآخر؟ لا يمكن التراجع عن الحذف.");
+  if (!confirmed) return;
+  button.disabled = true;
+  button.textContent = "جارٍ الحذف...";
+  try {
+    const { error } = await supabase
+      .from("messages")
+      .delete()
+      .eq("id", messageId)
+      .eq("conversation_id", currentChatId);
+    if (error) throw error;
+    await fetchMessages(currentChatId);
+    showAppMessage("تم حذف الرسالة من المحادثة للطرفين ✅");
+  } catch (error) {
+    console.error(error);
+    showAppMessage("تعذر حذف الرسالة: " + friendlyError(error));
+    button.disabled = false;
+    button.textContent = "حذف للطرفين";
+  }
 }
 
 async function loadMessages(chatId) {
