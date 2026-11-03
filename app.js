@@ -26,7 +26,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDOGZx-9AcJv8JFQz7lxbj2_zKVCI3jce8",
+  apiKey: "AIzaSyDOGZx-9AcJv8JFQz7lxbj2_zKVC3I3jce8",
   authDomain: "a-chat-d8def.firebaseapp.com",
   projectId: "a-chat-d8def",
   storageBucket: "a-chat-d8def.firebasestorage.app",
@@ -64,10 +64,13 @@ const myName = $("myName");
 
 let currentUser = null;
 let currentChatId = null;
+let currentFriendId = null;
+
 let unsubscribeChats = null;
 let unsubscribeMessages = null;
 let lastSeenTimer = null;
 
+// الرسائل
 function showMessage(text) {
   message.textContent = text;
 }
@@ -120,7 +123,7 @@ async function createProfile(user) {
   myName.textContent = username;
 }
 
-// تحديث آخر ظهور
+// آخر ظهور
 async function updateLastSeen() {
   if (!currentUser) return;
 
@@ -156,7 +159,10 @@ function stopLastSeen() {
 }
 
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && currentUser) {
+  if (
+    document.visibilityState === "visible" &&
+    currentUser
+  ) {
     updateLastSeen();
   }
 });
@@ -204,7 +210,11 @@ loginBtn.addEventListener("click", async () => {
   try {
     showMessage("جارٍ تسجيل الدخول...");
 
-    await signInWithEmailAndPassword(auth, email, password);
+    await signInWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
 
     showMessage("تم تسجيل الدخول بنجاح 🎉");
 
@@ -213,7 +223,7 @@ loginBtn.addEventListener("click", async () => {
   }
 });
 
-// مراقبة تسجيل الدخول
+// متابعة تسجيل الدخول
 onAuthStateChanged(auth, async user => {
   currentUser = user;
 
@@ -225,6 +235,7 @@ onAuthStateChanged(auth, async user => {
       await createProfile(user);
       startLastSeen();
       loadChats();
+
     } catch (error) {
       showAppMessage("تعذر تحميل الحساب: " + error.message);
     }
@@ -242,6 +253,8 @@ onAuthStateChanged(auth, async user => {
     unsubscribeMessages = null;
 
     currentChatId = null;
+    currentFriendId = null;
+
     conversationSection.hidden = true;
   }
 });
@@ -302,7 +315,7 @@ searchBtn.addEventListener("click", async () => {
   }
 });
 
-// معرف المحادثة
+// إنشاء معرف المحادثة
 function makeChatId(uid1, uid2) {
   return [uid1, uid2].sort().join("_");
 }
@@ -313,9 +326,8 @@ function formatLastSeen(timestamp) {
     return "آخر ظهور غير متاح";
   }
 
-  const date = timestamp.toDate();
-
-  return "آخر ظهور: " + date.toLocaleString("ar-EG");
+  return "آخر ظهور: " +
+    timestamp.toDate().toLocaleString("ar-EG");
 }
 
 // فتح محادثة
@@ -323,9 +335,12 @@ async function openChat(friendId, friendName) {
   if (!currentUser) return;
 
   try {
-    const chatId = makeChatId(currentUser.uid, friendId);
-    const chatRef = doc(db, "chats", chatId);
+    const chatId = makeChatId(
+      currentUser.uid,
+      friendId
+    );
 
+    const chatRef = doc(db, "chats", chatId);
     const chatSnap = await getDoc(chatRef);
 
     if (!chatSnap.exists()) {
@@ -338,13 +353,13 @@ async function openChat(friendId, friendName) {
     }
 
     currentChatId = chatId;
+    currentFriendId = friendId;
 
     chatTitle.textContent = friendName;
-
     conversationSection.hidden = false;
+
     searchResults.replaceChildren();
 
-    // عرض آخر ظهور
     const profileSnap = await getDoc(
       doc(db, "publicProfiles", friendId)
     );
@@ -354,7 +369,11 @@ async function openChat(friendId, friendName) {
     if (!status) {
       status = document.createElement("p");
       status.id = "friendStatus";
-      chatTitle.insertAdjacentElement("afterend", status);
+
+      chatTitle.insertAdjacentElement(
+        "afterend",
+        status
+      );
     }
 
     status.textContent = profileSnap.exists()
@@ -384,6 +403,7 @@ function loadChats() {
       const empty = document.createElement("p");
       empty.className = "empty-state";
       empty.textContent = "لا توجد محادثات حتى الآن.";
+
       chatsList.appendChild(empty);
       return;
     }
@@ -393,6 +413,7 @@ function loadChats() {
     chats.sort((a, b) => {
       const timeA = a.data().updatedAt?.seconds || 0;
       const timeB = b.data().updatedAt?.seconds || 0;
+
       return timeB - timeA;
     });
 
@@ -444,9 +465,46 @@ function loadChats() {
   });
 }
 
-// تحميل الرسائل
+// تحديد الرسائل كمقروءة
+async function markMessageAsRead(messageDoc) {
+  const data = messageDoc.data();
+
+  if (!currentUser || data.senderId === currentUser.uid) {
+    return;
+  }
+
+  const readBy = Array.isArray(data.readBy)
+    ? data.readBy
+    : [];
+
+  if (readBy.includes(currentUser.uid)) {
+    return;
+  }
+
+  const updatedReadBy = [
+    ...new Set([
+      ...readBy,
+      data.senderId,
+      currentUser.uid
+    ])
+  ];
+
+  if (updatedReadBy.length !== 2) return;
+
+  try {
+    await updateDoc(messageDoc.ref, {
+      readBy: updatedReadBy
+    });
+  } catch (error) {
+    console.error("Read receipt error:", error);
+  }
+}
+
+// تحميل الرسائل وعلامات القراءة
 function loadMessages(chatId) {
-  if (unsubscribeMessages) unsubscribeMessages();
+  if (unsubscribeMessages) {
+    unsubscribeMessages();
+  }
 
   messagesList.replaceChildren();
 
@@ -461,13 +519,38 @@ function loadMessages(chatId) {
     snapshot.forEach(messageDoc => {
       const data = messageDoc.data();
 
+      // تحديد الرسائل الواردة كمقروءة
+      markMessageAsRead(messageDoc);
+
       const bubble = document.createElement("div");
 
-      bubble.className =
-        "message " +
-        (data.senderId === currentUser.uid ? "mine" : "theirs");
+      const isMine =
+        data.senderId === currentUser.uid;
 
-      bubble.textContent = data.text;
+      bubble.className =
+        "message " + (isMine ? "mine" : "theirs");
+
+      const text = document.createElement("span");
+      text.textContent = data.text;
+
+      bubble.appendChild(text);
+
+      // علامات الصح للرسائل المرسلة
+      if (isMine) {
+        const ticks = document.createElement("span");
+
+        ticks.className = "message-ticks";
+
+        const readBy = Array.isArray(data.readBy)
+          ? data.readBy
+          : [];
+
+        const isRead = readBy.includes(currentFriendId);
+
+        ticks.textContent = isRead ? " ✓✓" : " ✓";
+
+        bubble.appendChild(ticks);
+      }
 
       messagesList.appendChild(bubble);
     });
@@ -497,20 +580,25 @@ async function sendMessage() {
       {
         senderId: currentUser.uid,
         text,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        readBy: [currentUser.uid]
       }
     );
 
-    await updateDoc(doc(db, "chats", currentChatId), {
-      lastMessage: text,
-      updatedAt: serverTimestamp()
-    });
+    await updateDoc(
+      doc(db, "chats", currentChatId),
+      {
+        lastMessage: text,
+        updatedAt: serverTimestamp()
+      }
+    );
 
     messageInput.value = "";
     showAppMessage("");
 
   } catch (error) {
     showAppMessage("تعذر إرسال الرسالة: " + error.message);
+
   } finally {
     sendBtn.disabled = false;
   }
@@ -534,6 +622,7 @@ backBtn.addEventListener("click", () => {
   }
 
   currentChatId = null;
+  currentFriendId = null;
 });
 
 // تسجيل الخروج
@@ -541,6 +630,7 @@ logoutBtn.addEventListener("click", async () => {
   try {
     await signOut(auth);
     showMessage("تم تسجيل الخروج");
+
   } catch (error) {
     showAppMessage("تعذر تسجيل الخروج: " + error.message);
   }
