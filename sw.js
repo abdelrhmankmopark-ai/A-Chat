@@ -1,17 +1,18 @@
-const CACHE_NAME = "a-chat-v1";
+const CACHE_NAME = "a-chat-v2";
 
 const APP_FILES = [
   "./",
   "./index.html",
   "./style.css",
+  "./app.js",
   "./manifest.json"
 ];
 
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(APP_FILES);
-    })
+    caches.open(CACHE_NAME).then(cache =>
+      cache.addAll(APP_FILES)
+    )
   );
 
   self.skipWaiting();
@@ -32,11 +33,38 @@ self.addEventListener("activate", event => {
 });
 
 self.addEventListener("fetch", event => {
-  if (event.request.method !== "GET") return;
+  const request = event.request;
+
+  if (
+    request.method !== "GET" ||
+    new URL(request.url).origin !== self.location.origin
+  ) {
+    return;
+  }
 
   event.respondWith(
-    fetch(event.request).catch(() =>
-      caches.match(event.request)
-    )
+    fetch(request)
+      .then(response => {
+        if (response.ok) {
+          const copy = response.clone();
+
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(request, copy);
+          });
+        }
+
+        return response;
+      })
+      .catch(async () => {
+        const cached = await caches.match(request);
+
+        if (cached) return cached;
+
+        if (request.mode === "navigate") {
+          return caches.match("./index.html");
+        }
+
+        return Response.error();
+      })
   );
 });
