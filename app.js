@@ -256,7 +256,10 @@ signupBtn.addEventListener("click", async () => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { avatar: selectedAvatar } }
+      options: {
+        data: { avatar: selectedAvatar },
+        emailRedirectTo: window.location.origin + window.location.pathname
+      }
     });
     if (error) throw error;
 
