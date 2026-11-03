@@ -5,11 +5,29 @@
   }
 
 :root {
+color-scheme: dark;
 --bg: #0b1220;
 --panel: #151f32;
 --primary: #18c8a5;
 --text: #f5f7fb;
 --muted: #9aa9bd;
+--input: #0b1628;
+--border: #26354c;
+--secondary: #26354c;
+--shadow: #0004;
+}
+
+body.light {
+color-scheme: light;
+--bg: #f1f5f9;
+--panel: #ffffff;
+--primary: #079b80;
+--text: #172337;
+--muted: #64748b;
+--input: #f8fafc;
+--border: #dbe3ed;
+--secondary: #e5edf5;
+--shadow: #64748b22;
 }
 
 body {
@@ -17,15 +35,17 @@ font-family: Tahoma, Arial, sans-serif;
 background: var(--bg);
 color: var(--text);
 min-height: 100vh;
+transition: background .3s, color .3s;
 }
 
 .topbar {
-padding: 20px;
+padding: 18px 20px;
 display: flex;
 justify-content: space-between;
 align-items: center;
-background: #111c2e;
-border-bottom: 1px solid #26354c;
+background: var(--panel);
+border-bottom: 1px solid var(--border);
+transition: background .3s;
 }
 
 .topbar h1 {
@@ -33,9 +53,26 @@ color: var(--primary);
 font-size: 25px;
 }
 
-.topbar span {
+.header-actions {
+display: flex;
+align-items: center;
+gap: 12px;
+}
+
+.header-actions span {
 color: var(--muted);
 font-size: 12px;
+}
+
+.theme-btn {
+width: 43px;
+height: 43px;
+padding: 0;
+margin: 0;
+border-radius: 13px;
+background: var(--secondary);
+color: var(--text);
+font-size: 20px;
 }
 
 .container {
@@ -56,6 +93,7 @@ display: grid;
 place-items: center;
 border-radius: 24px;
 background: linear-gradient(135deg, #18c8a5, #087eaa);
+color: white;
 font-size: 42px;
 font-weight: bold;
 box-shadow: 0 10px 35px #18c8a533;
@@ -73,10 +111,11 @@ font-size: 14px;
 
 .auth-box {
 background: var(--panel);
-border: 1px solid #26354c;
+border: 1px solid var(--border);
 border-radius: 22px;
 padding: 25px;
-box-shadow: 0 15px 40px #0004;
+box-shadow: 0 15px 40px var(--shadow);
+transition: background .3s;
 }
 
 .auth-box h2 {
@@ -88,11 +127,11 @@ input {
 width: 100%;
 padding: 16px;
 margin-bottom: 14px;
-border: 1px solid #34445c;
+border: 1px solid var(--border);
 border-radius: 12px;
 outline: none;
-background: #0b1628;
-color: white;
+background: var(--input);
+color: var(--text);
 font-size: 15px;
 }
 
@@ -106,7 +145,7 @@ padding: 15px;
 border: none;
 border-radius: 12px;
 background: var(--primary);
-color: #071b1a;
+color: white;
 font-size: 16px;
 font-weight: bold;
 cursor: pointer;
@@ -114,8 +153,8 @@ margin-top: 8px;
 }
 
 button.secondary {
-background: #26354c;
-color: white;
+background: var(--secondary);
+color: var(--text);
 }
 
 #message {
@@ -123,4 +162,8 @@ text-align: center;
 color: var(--primary);
 margin-top: 15px;
 font-size: 13px;
+}
+
+button:active {
+transform: scale(.98);
 }
