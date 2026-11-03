@@ -3,36 +3,80 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#101b2d">
-  <meta name="description" content="A-Chat - منصة مراسلة فورية">
+  <meta name="description" content="A-Chat - تواصل مع أصدقائك">
   <title>A-Chat</title>
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="./style.css">
 </head>
-<body>  <header class="topbar">
-    <h1>A-Chat</h1>
-    <div class="header-actions">
-      <span>مراسلتك تبدأ هنا</span>
-      <button id="themeToggle" class="theme-btn" aria-label="تغيير المظهر">☀️</button>
-    </div>
-  </header>  <main class="container">
-    <section class="welcome">
-      <div class="logo">A</div>
-      <h2>أهلاً بك في A-Chat</h2>
-      <p>تواصل مع أصدقائك بسهولة وأمان.</p>
-    </section><section class="auth-box">
-  <h2>تسجيل الدخول</h2>
+<body><header class="topbar">
+  <h1>A-Chat</h1>
+  <div class="header-actions">
+    <span>تواصل بلا حدود</span>
+    <button id="themeToggle" class="theme-btn">☀️</button>
+  </div>
+</header><main class="container">  <section id="authSection"><section class="welcome">
+  <div class="logo">A</div>
+  <h2>أهلاً بك في A-Chat</h2>
+  <p>مكانك للتواصل مع أصدقائك.</p>
+</section>
+
+<section class="auth-box">
+  <h2>حسابك الشخصي</h2>
+
   <input id="email" type="email" placeholder="البريد الإلكتروني">
   <input id="password" type="password" placeholder="كلمة المرور">
+
   <button id="loginBtn">تسجيل الدخول</button>
   <button id="signupBtn" class="secondary">إنشاء حساب جديد</button>
+
   <p id="message" aria-live="polite"></p>
 </section>
 
-  </main>  <script type="module" src="./app.js"></script>  <script>
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./sw.js");
-      });
-    }
-  </script></body>
+  </section>  <section id="chatSection" hidden><div class="profile-bar">
+  <div>
+    <strong id="myName">مستخدم A-Chat</strong>
+    <p>حسابك الشخصي</p>
+  </div>
+  <button id="logoutBtn" class="logout-btn">خروج</button>
+</div>
+
+<div class="search-box">
+  <h2>🔎 البحث عن الأصدقاء</h2>
+  <input id="searchInput" type="email"
+    placeholder="اكتب البريد الإلكتروني للصديق">
+  <button id="searchBtn">بحث</button>
+  <div id="searchResults"></div>
+</div>
+
+<div class="chats-box">
+  <h2>💬 محادثاتي</h2>
+  <div id="chatsList">
+    <p class="empty-state">لا توجد محادثات حتى الآن.</p>
+  </div>
+</div>
+
+<section id="conversationSection" hidden>
+  <div class="conversation-header">
+    <button id="backBtn">رجوع</button>
+    <h3 id="chatTitle">المحادثة</h3>
+  </div>
+
+  <div id="messagesList" class="messages-list"></div>
+
+  <div class="message-form">
+    <input id="messageInput" type="text"
+      placeholder="اكتب رسالتك...">
+    <button id="sendBtn">إرسال</button>
+  </div>
+</section>
+
+<p id="appMessage" aria-live="polite"></p>
+
+  </section></main><script type="module" src="./app.js"></script><script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js");
+  });
+}
+</script></body>
 </html>
